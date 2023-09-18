@@ -1,0 +1,22 @@
+{
+  "name": "xfrelay_server",
+  "version": "0.0.1",
+  "description": "A server that does things.",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "BadAimWeeb",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@badaimweeb/js-dtsocket": "^0.5.4",
+    "@badaimweeb/js-protov2d": "^0.4.1",
+    "dotenv": "^16.3.1",
+    "zod": "^3.22.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.6.2",
+    "typescript": "^5.2.2"
+  }
+}
