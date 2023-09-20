@@ -164,3 +164,5 @@ apiServer.on("session", (cSocket) => {
 
 console.log("PQ hash:", key.publicKeyHash);
 console.log("(append !<hash> to the end of URL to be able to connect to this server)");
+
+export type API = typeof apiServer;
