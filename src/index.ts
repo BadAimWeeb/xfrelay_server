@@ -4,11 +4,11 @@ import { existsSync } from "fs";
 import path from "path";
 
 import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
-import { DTSocketServer, InitProcedureGenerator, type Socket } from "@badaimweeb/js-dtsocket";
+import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket";
 import z from "zod";
 
-type SpecificData = never;
-type SpecificDataResponse = never;
+type SpecificData = "";
+type SpecificDataResponse = "";
 
 type GlobalData = {
     [accountID: string]: [tabID: string, expires: number][]
@@ -35,7 +35,7 @@ const procedures = {
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (_gState, lState, input, socket) => {
+        .resolve(async (_gState, lState, input) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
@@ -54,7 +54,7 @@ const procedures = {
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (_gState, lState, input, socket) => {
+        .resolve(async (_gState, lState, input) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
