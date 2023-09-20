@@ -22,24 +22,7 @@ type LocalData = {
 const gState: GlobalData = {};
 
 const p = InitProcedureGenerator<GlobalData, LocalData>();
-
-const apiServer = new DTSocketServer<
-    GlobalData,
-    LocalData,
-    {
-        csEvents: {
-            data: (tabID: string, data: string) => void; // send fb data to relay
-            specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
-        },
-        scEvents: {
-            recData: (tabID: string, data: string) => void; // data sent from browser to relay server
-            injData: (data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
-            newTab: (tabID: string[]) => void; // new tab created
-            delTab: (tabID: string[]) => void; // tab closed
-            requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
-        }
-    }
->({
+const procedures = {
     // Browser-side
     registerInput: p
         .input(z.string())
@@ -130,7 +113,26 @@ const apiServer = new DTSocketServer<
 
             return true;
         })
-}, gState);
+};
+
+const apiServer = new DTSocketServer<
+    GlobalData,
+    LocalData,
+    {
+        csEvents: {
+            data: (tabID: string, data: string) => void; // send fb data to relay
+            specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
+        },
+        scEvents: {
+            recData: (tabID: string, data: string) => void; // data sent from browser to relay server
+            injData: (data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
+            newTab: (tabID: string[]) => void; // new tab created
+            delTab: (tabID: string[]) => void; // tab closed
+            requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
+        }
+    },
+    typeof procedures
+>(procedures, gState);
 
 let key: {
     privateKey: string;
