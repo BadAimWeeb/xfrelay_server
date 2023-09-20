@@ -10,7 +10,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@badaimweeb/js-dtsocket": "^0.5.4",
+    "@badaimweeb/js-dtsocket": "^0.6.0",
     "@badaimweeb/js-protov2d": "^0.4.1",
     "dotenv": "^16.3.1",
     "zod": "^3.22.2"
