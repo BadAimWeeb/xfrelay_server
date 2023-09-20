@@ -138,7 +138,7 @@ let key: {
     privateKey: string;
     publicKey: string;
     publicKeyHash: string;
-} | undefined = void 0;
+};
 
 if (existsSync(path.join(process.cwd(), "pqkey.json"))) {
     key = JSON.parse(await fs.readFile(path.join(process.cwd(), "pqkey.json"), "utf-8"));
