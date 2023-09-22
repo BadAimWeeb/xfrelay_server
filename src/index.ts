@@ -91,6 +91,7 @@ const procedures = {
     injectData: p
         .input(z.object({
             data: z.string(),
+            qos: z.number(),
             tabID: z.string().optional()
         }))
         .resolve(async (_gState, lState, input, socket) => {
@@ -105,13 +106,11 @@ const procedures = {
                 if (tabs.length === 0) return false;
 
                 const tab = tabs[Math.floor(Math.random() * tabs.length)];
-                apiServer.to(lState.outputAccount).emit("injData", input.data, tab[0]);
+                return apiServer.to(lState.outputAccount).emit("injData", input.qos, input.data, tab[0]);
             } else {
                 if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return false;
-                apiServer.to(lState.outputAccount).emit("injData", input.data, input.tabID);
+                return apiServer.to(lState.outputAccount).emit("injData", input.qos, input.data, input.tabID);
             }
-
-            return true;
         })
 };
 
@@ -125,7 +124,7 @@ const apiServer = new DTSocketServer<
         },
         scEvents: {
             recData: (tabID: string, data: string) => void; // data sent from browser to relay server
-            injData: (data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
+            injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
             newTab: (tabID: string[]) => void; // new tab created
             delTab: (tabID: string[]) => void; // tab closed
             requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
