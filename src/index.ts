@@ -94,7 +94,7 @@ const procedures = {
             qos: z.number(),
             tabID: z.string().optional()
         }))
-        .resolve(async (_gState, lState, input, socket) => {
+        .resolve(async (_gState, lState, input, socket): Promise<boolean> => {
             if (lState.outputAccount === void 0) return false;
             if (_gState[lState.outputAccount] === void 0) return false;
             _gState[lState.outputAccount] = _gState[lState.outputAccount]
