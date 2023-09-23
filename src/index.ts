@@ -7,8 +7,8 @@ import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
 import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket";
 import z from "zod";
 
-type SpecificData = "";
-type SpecificDataResponse = "";
+type SpecificData = "currentUserID";
+type SpecificDataResponse = string;
 
 type GlobalData = {
     [accountID: string]: [tabID: string, expires: number][]
