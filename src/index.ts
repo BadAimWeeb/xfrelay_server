@@ -141,8 +141,9 @@ const procedures = {
 
             let nonce = Math.random();
             return new Promise((resolve) => {
-                const listener = (nonce: number, specificData: SpecificDataResponse) => {
-                    if (nonce !== nonce) return;
+                const listener = (returnNonce: number, specificData: SpecificDataResponse) => {
+                    if (nonce !== returnNonce) return;
+                    
                     apiServer.off("specificData", listener);
                     resolve(specificData);
                 };
