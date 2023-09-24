@@ -30,8 +30,10 @@ const procedures = {
     // Browser-side
     registerInput: p
         .input(z.string())
-        .resolve(async (_gState, lState, input) => {
+        .resolve(async (_gState, lState, input, socket) => {
             lState.account = input;
+            socket.rooms.clear();
+            socket.join("INPUT!" + input);
             return true;
         }),
     registerInputTab: p
@@ -50,6 +52,7 @@ const procedures = {
                     _gState[lState.account][index][1] = Date.now() + 1000 * 60; // 60s to live
                 } else {
                     _gState[lState.account].push([tabID, Date.now() + 1000 * 60]);
+                    apiServer.to(lState.account).emit("newTab", [tabID]);
                 }
             }
 
@@ -64,12 +67,18 @@ const procedures = {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
+            let deletedTabs: string[] = [];
             for (const tabID of input) {
                 if (_gState[lState.account] === void 0) _gState[lState.account] = [];
                 let index = _gState[lState.account].findIndex((v) => v[0] === tabID)
                 if (index + 1) {
+                    deletedTabs.push(tabID);
                     _gState[lState.account].splice(index, 1);
                 }
+            }
+
+            if (deletedTabs.length > 0) {
+                apiServer.to(lState.account).emit("delTab", deletedTabs);
             }
 
             return true;
@@ -138,7 +147,7 @@ const procedures = {
                     resolve(specificData);
                 };
                 socket.on("specificData", listener);
-                apiServer.to(lState.outputAccount).emit("requestSpecificData", input.tabID, input.specificData, nonce);
+                apiServer.to("INPUT!" + lState.outputAccount).emit("requestSpecificData", input.tabID, input.specificData, nonce);
             });
         })
 };
