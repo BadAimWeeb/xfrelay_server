@@ -7,7 +7,7 @@ import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
 import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket";
 import z from "zod";
 
-type SpecificData = "currentUserID";
+type SpecificData = "currentUserID" | "serverAppID";
 type SpecificDataResponse = string;
 
 type GlobalData = {
@@ -44,6 +44,8 @@ const procedures = {
                 let index = _gState[lState.account].findIndex((v) => v[0] === tabID)
                 if (index + 1) {
                     _gState[lState.account][index][1] = Date.now() + 1000 * 60; // 60s to live
+                } else {
+                    _gState[lState.account].push([tabID, Date.now() + 1000 * 60]);
                 }
             }
 
@@ -80,11 +82,11 @@ const procedures = {
         }),
     getTabs: p
         .input(z.void())
-        .resolve(async (_gState, lState) => {
+        .resolve(async (gState, lState) => {
             if (lState.outputAccount === void 0) return [];
-            if (_gState[lState.outputAccount] === void 0) return [];
+            if (gState[lState.outputAccount] === void 0) return [];
 
-            return _gState[lState.outputAccount]
+            return gState[lState.outputAccount]
                 .filter((v) => v[1] > Date.now())
                 .map((v) => v[0]);
         }),
