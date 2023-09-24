@@ -8,6 +8,10 @@ import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket"
 import z from "zod";
 
 type SpecificData = "currentUserID" | "serverAppID";
+let specificDataGuard = z.union([
+    z.literal("currentUserID"), 
+    z.literal("serverAppID")
+]);
 type SpecificDataResponse = string;
 
 type GlobalData = {
@@ -113,6 +117,29 @@ const procedures = {
                 if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return false;
                 return apiServer.to(lState.outputAccount).emit("injData", input.qos, input.data, input.tabID);
             }
+        }),
+
+    requestSpecificData: p
+        .input(z.object({
+            tabID: z.string(),
+            specificData: z.array(specificDataGuard)
+        }))
+        .resolve(async (_gState, lState, input, socket): Promise<SpecificDataResponse> => {
+            if (lState.outputAccount === void 0) return "";
+            if (_gState[lState.outputAccount] === void 0) return "";
+
+            if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return "";
+
+            let nonce = Math.random();
+            return new Promise((resolve) => {
+                const listener = (nonce: number, specificData: SpecificDataResponse) => {
+                    if (nonce !== nonce) return;
+                    socket.off("specificData", listener);
+                    resolve(specificData);
+                };
+                socket.on("specificData", listener);
+                apiServer.to(lState.outputAccount).emit("requestSpecificData", input.tabID, input.specificData, nonce);
+            });
         })
 };
 
