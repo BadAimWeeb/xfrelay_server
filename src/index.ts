@@ -143,10 +143,10 @@ const procedures = {
             return new Promise((resolve) => {
                 const listener = (nonce: number, specificData: SpecificDataResponse) => {
                     if (nonce !== nonce) return;
-                    socket.off("specificData", listener);
+                    apiServer.off("specificData", listener);
                     resolve(specificData);
                 };
-                socket.on("specificData", listener);
+                apiServer.on("specificData", listener);
                 apiServer.to("INPUT!" + lState.outputAccount).emit("requestSpecificData", input.tabID, input.specificData, nonce);
             });
         })
