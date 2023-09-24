@@ -139,7 +139,7 @@ const procedures = {
 
             if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return "";
 
-            let nonce = Math.random();
+            let nonce = crypto.getRandomValues(new Uint32Array(1))[0];
             return new Promise((resolve) => {
                 const listener = (returnNonce: number, specificData: SpecificDataResponse) => {
                     if (nonce !== returnNonce) return;
