@@ -122,7 +122,7 @@ const procedures = {
     requestSpecificData: p
         .input(z.object({
             tabID: z.string(),
-            specificData: z.array(specificDataGuard)
+            specificData: specificDataGuard
         }))
         .resolve(async (_gState, lState, input, socket): Promise<SpecificDataResponse> => {
             if (lState.outputAccount === void 0) return "";
