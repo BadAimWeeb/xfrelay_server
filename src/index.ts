@@ -7,10 +7,11 @@ import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
 import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket";
 import z from "zod";
 
-type SpecificData = "currentUserID" | "serverAppID";
+type SpecificData = "currentUserID" | "serverAppID" | "lsVersion";
 let specificDataGuard = z.union([
     z.literal("currentUserID"), 
-    z.literal("serverAppID")
+    z.literal("serverAppID"),
+    z.literal("lsVersion")
 ]);
 type SpecificDataResponse = string;
 
