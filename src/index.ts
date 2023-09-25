@@ -121,10 +121,10 @@ const procedures = {
                 if (tabs.length === 0) return false;
 
                 const tab = tabs[Math.floor(Math.random() * tabs.length)];
-                return apiServer.to(lState.outputAccount).emit("injData", input.qos, input.data, tab[0]);
+                return apiServer.to("INPUT!" + lState.outputAccount).emit("injData", input.qos, input.data, tab[0]);
             } else {
                 if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return false;
-                return apiServer.to(lState.outputAccount).emit("injData", input.qos, input.data, input.tabID);
+                return apiServer.to("INPUT!" + lState.outputAccount).emit("injData", input.qos, input.data, input.tabID);
             }
         }),
 
