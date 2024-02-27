@@ -4,12 +4,12 @@ import { existsSync } from "fs";
 import path from "path";
 
 import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
-import { DTSocketServer, InitProcedureGenerator } from "@badaimweeb/js-dtsocket";
+import { DTSocketServer, InitProcedureGenerator, type ServerContext, type Socket } from "@badaimweeb/js-dtsocket";
 import z from "zod";
 
 type SpecificData = "currentUserID" | "serverAppID" | "lsVersion";
 let specificDataGuard = z.union([
-    z.literal("currentUserID"), 
+    z.literal("currentUserID"),
     z.literal("serverAppID"),
     z.literal("lsVersion")
 ]);
@@ -26,7 +26,7 @@ type LocalData = {
 
 const gState: GlobalData = {};
 
-const p = InitProcedureGenerator<GlobalData, LocalData>();
+const p = InitProcedureGenerator<ServerContext<GlobalData, LocalData>>();
 const procedures = {
     // Browser-side
     registerInput: p
@@ -144,7 +144,7 @@ const procedures = {
             return new Promise((resolve) => {
                 const listener = (returnNonce: number, specificData: SpecificDataResponse) => {
                     if (nonce !== returnNonce) return;
-                    
+
                     apiServer.off("specificData", listener);
                     resolve(specificData);
                 };
@@ -155,22 +155,25 @@ const procedures = {
 };
 
 const apiServer = new DTSocketServer<
-    GlobalData,
-    LocalData,
-    {
-        csEvents: {
-            data: (tabID: string, data: string) => void; // send fb data to relay
-            specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
+    ServerContext<
+        GlobalData,
+        LocalData,
+        {
+            csEvents: {
+                data: (tabID: string, data: string) => void; // send fb data to relay
+                specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
+            },
+            scEvents: {
+                recData: (tabID: string, data: string) => void; // data sent from browser to relay server
+                injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
+                newTab: (tabID: string[]) => void; // new tab created
+                delTab: (tabID: string[]) => void; // tab closed
+                requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
+            }
         },
-        scEvents: {
-            recData: (tabID: string, data: string) => void; // data sent from browser to relay server
-            injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
-            newTab: (tabID: string[]) => void; // new tab created
-            delTab: (tabID: string[]) => void; // tab closed
-            requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
-        }
-    },
-    typeof procedures
+        Socket,
+        typeof procedures
+    >
 >(procedures, gState);
 
 let key: {

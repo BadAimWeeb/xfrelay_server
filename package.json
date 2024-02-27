@@ -13,13 +13,13 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@badaimweeb/js-dtsocket": "^0.6.0",
-    "@badaimweeb/js-protov2d": "^0.4.1",
-    "dotenv": "^16.3.1",
-    "zod": "^3.22.2"
+    "@badaimweeb/js-dtsocket": "^0.7.1",
+    "@badaimweeb/js-protov2d": "^1.0.13",
+    "dotenv": "^16.4.5",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/node": "^20.6.2",
-    "typescript": "^5.2.2"
+    "@types/node": "^20.11.20",
+    "typescript": "^5.3.3"
   }
 }
