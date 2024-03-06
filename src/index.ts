@@ -6,6 +6,7 @@ import path from "path";
 import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
 import { DTSocketServer, InitProcedureGenerator, type ServerContext, type Socket } from "@badaimweeb/js-dtsocket";
 import z from "zod";
+import type { DTSocketServer_CSocket } from "@badaimweeb/js-dtsocket/dist/server_csocket";
 
 type SpecificData = "currentUserID" | "serverAppID" | "lsVersion";
 let specificDataGuard = z.union([
@@ -16,7 +17,7 @@ let specificDataGuard = z.union([
 type SpecificDataResponse = string;
 
 type GlobalData = {
-    [accountID: string]: [tabID: string, expires: number][]
+    [accountID: string]: [tabID: string, expires: number, socket: DTSocketServer_CSocket<ServerContext<GlobalData, LocalData>>][]
 };
 
 type LocalData = {
@@ -37,44 +38,46 @@ const procedures = {
             socket.join("INPUT!" + input);
             return true;
         }),
+
     registerInputTab: p
         .input(
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (_gState, lState, input) => {
+        .resolve(async (gState, lState, input, socket) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
             for (const tabID of input) {
-                if (_gState[lState.account] === void 0) _gState[lState.account] = [];
-                let index = _gState[lState.account].findIndex((v) => v[0] === tabID)
+                if (gState[lState.account] === void 0) gState[lState.account] = [];
+                let index = gState[lState.account].findIndex((v) => v[0] === tabID)
                 if (index + 1) {
-                    _gState[lState.account][index][1] = Date.now() + 1000 * 60; // 60s to live
+                    gState[lState.account][index][1] = Date.now() + 1000 * 60; // 60s to live
                 } else {
-                    _gState[lState.account].push([tabID, Date.now() + 1000 * 60]);
+                    gState[lState.account].push([tabID, Date.now() + 1000 * 60, socket]);
                     apiServer.to(lState.account).emit("newTab", [tabID]);
                 }
             }
 
             return true;
         }),
+
     unregisterInputTab: p
         .input(
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (_gState, lState, input) => {
+        .resolve(async (gState, lState, input) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
             let deletedTabs: string[] = [];
             for (const tabID of input) {
-                if (_gState[lState.account] === void 0) _gState[lState.account] = [];
-                let index = _gState[lState.account].findIndex((v) => v[0] === tabID)
+                if (gState[lState.account] === void 0) gState[lState.account] = [];
+                let index = gState[lState.account].findIndex((v) => v[0] === tabID)
                 if (index + 1) {
                     deletedTabs.push(tabID);
-                    _gState[lState.account].splice(index, 1);
+                    gState[lState.account].splice(index, 1);
                 }
             }
 
@@ -83,6 +86,27 @@ const procedures = {
             }
 
             return true;
+        }),
+
+    getFCAClients: p
+        .input(z.void())
+        .resolve(async (gState, lState, _, socket) => {
+            if (lState.account === void 0) return [];
+            if (gState[lState.account] === void 0) return [];
+
+            return socket.server.rooms.get(lState.account)?.size || 0;
+        }),
+
+    // Both side
+    getTabs: p
+        .input(z.void())
+        .resolve(async (gState, lState) => {
+            if (lState.outputAccount === void 0 && lState.account === void 0) return [];
+            if (gState[lState.outputAccount || lState.account] === void 0) return [];
+
+            return gState[lState.outputAccount || lState.account]
+                .filter((v) => v[1] > Date.now())
+                .map((v) => v[0]);
         }),
 
     // FCA-side
@@ -94,38 +118,30 @@ const procedures = {
 
             lState.outputAccount = input;
         }),
-    getTabs: p
-        .input(z.void())
-        .resolve(async (gState, lState) => {
-            if (lState.outputAccount === void 0) return [];
-            if (gState[lState.outputAccount] === void 0) return [];
 
-            return gState[lState.outputAccount]
-                .filter((v) => v[1] > Date.now())
-                .map((v) => v[0]);
-        }),
     injectData: p
         .input(z.object({
             data: z.string(),
             qos: z.number(),
             tabID: z.string().optional()
         }))
-        .resolve(async (_gState, lState, input, socket): Promise<boolean> => {
+        .resolve(async (gState, lState, input, socket): Promise<boolean> => {
             if (lState.outputAccount === void 0) return false;
-            if (_gState[lState.outputAccount] === void 0) return false;
-            _gState[lState.outputAccount] = _gState[lState.outputAccount]
+            if (gState[lState.outputAccount] === void 0) return false;
+            gState[lState.outputAccount] = gState[lState.outputAccount]
                 .filter((v) => v[1] > Date.now() ? true : (socket.to(v[0]).emit("delTab", [v[0]]), false));
 
             if (input.tabID === void 0) {
                 // Select random tab
-                const tabs = _gState[lState.outputAccount];
+                const tabs = gState[lState.outputAccount];
                 if (tabs.length === 0) return false;
 
                 const tab = tabs[Math.floor(Math.random() * tabs.length)];
-                return apiServer.to("INPUT!" + lState.outputAccount).emit("injData", input.qos, input.data, tab[0]);
+                return tab[2].emit("injData", input.qos, input.data, tab[0]);
             } else {
-                if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return false;
-                return apiServer.to("INPUT!" + lState.outputAccount).emit("injData", input.qos, input.data, input.tabID);
+                let tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID);
+                if (!tab) return false;
+                return tab[2].emit("injData", input.qos, input.data, input.tabID);
             }
         }),
 
@@ -134,11 +150,11 @@ const procedures = {
             tabID: z.string(),
             specificData: specificDataGuard
         }))
-        .resolve(async (_gState, lState, input, socket): Promise<SpecificDataResponse> => {
+        .resolve(async (gState, lState, input): Promise<SpecificDataResponse> => {
             if (lState.outputAccount === void 0) return "";
-            if (_gState[lState.outputAccount] === void 0) return "";
+            if (gState[lState.outputAccount] === void 0) return "";
 
-            if (_gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return "";
+            if (gState[lState.outputAccount].findIndex((v) => v[0] === input.tabID) === -1) return "";
 
             let nonce = crypto.getRandomValues(new Uint32Array(1))[0];
             return new Promise((resolve) => {
@@ -151,6 +167,43 @@ const procedures = {
                 apiServer.on("specificData", listener);
                 apiServer.to("INPUT!" + lState.outputAccount).emit("requestSpecificData", input.tabID, input.specificData, nonce);
             });
+        }),
+
+    sendHTTPRequest: p
+        .input(z.object({
+            data: z.string(),
+            tabID: z.string().optional().nullable()
+        }))
+        .resolve(async (_gState, lState, input, socket) => {
+            if (lState.outputAccount === void 0) return false;
+            if (gState[lState.outputAccount] === void 0) return false;
+            gState[lState.outputAccount] = gState[lState.outputAccount]
+                .filter((v) => v[1] > Date.now() ? true : (socket.to(v[0]).emit("delTab", [v[0]]), false));
+
+            let tab: (typeof gState)[string][number];
+            if (input.tabID === void 0) {
+                // Select random tab
+                const tabs = gState[lState.outputAccount];
+                if (tabs.length === 0) return false;
+
+                tab = tabs[Math.floor(Math.random() * tabs.length)];
+            } else {
+                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID);
+                if (!tab) return false;
+            }
+
+            let nonce = [...crypto.getRandomValues(new Uint32Array(4))].map(x => x.toString(16).padStart(8, "0")).join("");
+            return new Promise((resolve) => {
+                const listener = (data: string, returnNonce: string) => {
+                    if (nonce !== returnNonce) return;
+
+                    tab[2].off("httpInjResponseData", listener);
+                    resolve(data);
+                };
+
+                tab[2].on("httpInjResponseData", listener);
+                tab[2].emit("httpInjData", input.data, nonce, tab[0]);
+            });
         })
 };
 
@@ -162,10 +215,12 @@ const apiServer = new DTSocketServer<
             csEvents: {
                 data: (tabID: string, data: string) => void; // send fb data to relay
                 specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
+                httpInjResponseData: (data: string, nonce: string) => void; // response from browser to fca
             },
             scEvents: {
                 recData: (tabID: string, data: string) => void; // data sent from browser to relay server
                 injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
+                httpInjData: (data: string, nonce: string, tabID: string | undefined) => void; // data sent from fca to relay server
                 newTab: (tabID: string[]) => void; // new tab created
                 delTab: (tabID: string[]) => void; // tab closed
                 requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
