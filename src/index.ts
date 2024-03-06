@@ -204,7 +204,44 @@ const procedures = {
                 tab[2].on("httpInjResponseData", listener);
                 tab[2].emit("httpInjData", input.data, nonce, tab[0]);
             });
-        })
+        }),
+
+    uploadAttachment: p
+        .input(z.object({
+            dataEncrypted: z.string(),
+            tabID: z.string().optional().nullable()
+        }))
+        .resolve(async (_gState, lState, input, socket) => {
+            if (lState.outputAccount === void 0) return false;
+            if (gState[lState.outputAccount] === void 0) return false;
+            gState[lState.outputAccount] = gState[lState.outputAccount]
+                .filter((v) => v[1] > Date.now() ? true : (socket.to(v[0]).emit("delTab", [v[0]]), false));
+
+            let tab: (typeof gState)[string][number];
+            if (input.tabID === void 0) {
+                // Select random tab
+                const tabs = gState[lState.outputAccount];
+                if (tabs.length === 0) return false;
+
+                tab = tabs[Math.floor(Math.random() * tabs.length)];
+            } else {
+                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID);
+                if (!tab) return false;
+            }
+
+            let nonce = [...crypto.getRandomValues(new Uint32Array(4))].map(x => x.toString(16).padStart(8, "0")).join("");
+            return new Promise((resolve) => {
+                const listener = (data: string, returnNonce: string) => {
+                    if (nonce !== returnNonce) return;
+
+                    tab[2].off("uploadAttachmentResponse", listener);
+                    resolve(data);
+                };
+
+                tab[2].on("uploadAttachmentResponse", listener);
+                tab[2].emit("uploadAttachmentData", input.dataEncrypted, nonce, tab[0]);
+            });
+        }),
 };
 
 const apiServer = new DTSocketServer<
@@ -216,11 +253,13 @@ const apiServer = new DTSocketServer<
                 data: (tabID: string, data: string) => void; // send fb data to relay
                 specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
                 httpInjResponseData: (data: string, nonce: string) => void; // response from browser to fca
+                uploadAttachmentResponse: (data: string, nonce: string) => void; // response from browser to fca
             },
             scEvents: {
                 recData: (tabID: string, data: string) => void; // data sent from browser to relay server
                 injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
                 httpInjData: (data: string, nonce: string, tabID: string | undefined) => void; // data sent from fca to relay server
+                uploadAttachmentData: (dataEncrypted: string, nonce: string, tabID: string | undefined) => void; // data sent from fca to relay server
                 newTab: (tabID: string[]) => void; // new tab created
                 delTab: (tabID: string[]) => void; // tab closed
                 requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
