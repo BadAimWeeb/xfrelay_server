@@ -230,7 +230,7 @@ const procedures = {
             }
 
             let nonce = [...crypto.getRandomValues(new Uint32Array(4))].map(x => x.toString(16).padStart(8, "0")).join("");
-            return new Promise((resolve) => {
+            return new Promise<string>((resolve) => {
                 const listener = (data: string, returnNonce: string) => {
                     if (nonce !== returnNonce) return;
 
