@@ -6,7 +6,6 @@ import path from "path";
 import { Server as Pv2dServer, keyGeneration } from "@badaimweeb/js-protov2d";
 import { DTSocketServer, InitProcedureGenerator, type ServerContext, type Socket } from "@badaimweeb/js-dtsocket";
 import z from "zod";
-import type { DTSocketServer_CSocket } from "@badaimweeb/js-dtsocket/dist/server_csocket";
 
 type SpecificData = "currentUserID" | "serverAppID" | "lsVersion";
 let specificDataGuard = z.union([
@@ -16,8 +15,10 @@ let specificDataGuard = z.union([
 ]);
 type SpecificDataResponse = string;
 
+// very hacky
+type CSocket = Parameters<Parameters<DTSocketServer["cSockets"]["forEach"]>[0]>[0];
 type GlobalData = {
-    [accountID: string]: [tabID: string, expires: number, socket: DTSocketServer_CSocket<ServerContext<GlobalData, LocalData>>][]
+    [accountID: string]: [tabID: string, expires: number, socket: CSocket][]
 };
 
 type LocalData = {
@@ -27,7 +28,25 @@ type LocalData = {
 
 const gState: GlobalData = {};
 
-const p = InitProcedureGenerator<ServerContext<GlobalData, LocalData>>();
+type InitialContext = ServerContext<GlobalData, LocalData, {
+    csEvents: {
+        data: (tabID: string, data: string) => void; // send fb data to relay
+        specificData: (nonce: number, specificData: SpecificDataResponse) => void; // browser response to requestSpecificData
+        httpInjResponseData: (data: string, nonce: string) => void; // response from browser to fca
+        uploadAttachmentResponse: (data: string, nonce: string) => void; // response from browser to fca
+    },
+    scEvents: {
+        recData: (tabID: string, data: string) => void; // data sent from browser to relay server
+        injData: (qos: number, data: string, tabID?: string | undefined) => void; // data sent from fca to relay server
+        httpInjData: (data: string, nonce: string, tabID: string | undefined) => void; // data sent from fca to relay server
+        uploadAttachmentData: (dataEncrypted: string, nonce: string, tabID: string | undefined) => void; // data sent from fca to relay server
+        newTab: (tabID: string[]) => void; // new tab created
+        delTab: (tabID: string[]) => void; // tab closed
+        requestSpecificData: (tabID: string, specificData: SpecificData, nonce: number) => void; // request specific data from browser
+    }
+}, Socket>;
+
+const p = InitProcedureGenerator<InitialContext>();
 const procedures = {
     // Browser-side
     registerInput: p
@@ -44,12 +63,13 @@ const procedures = {
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (gState, lState, input, socket) => {
+        .resolve(async (gState: GlobalData, lState, input, socket) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
             for (const tabID of input) {
                 if (gState[lState.account] === void 0) gState[lState.account] = [];
+                
                 let index = gState[lState.account].findIndex((v) => v[0] === tabID)
                 if (index + 1) {
                     gState[lState.account][index][1] = Date.now() + 1000 * 60; // 60s to live
@@ -67,7 +87,7 @@ const procedures = {
             z.string()
                 .or(z.array(z.string()))
         )
-        .resolve(async (gState, lState, input) => {
+        .resolve(async (gState: GlobalData, lState, input) => {
             if (lState.account === void 0) return false;
             if (!Array.isArray(input)) input = [input];
 
@@ -100,7 +120,7 @@ const procedures = {
     // Both side
     getTabs: p
         .input(z.void())
-        .resolve(async (gState, lState) => {
+        .resolve(async (gState: GlobalData, lState) => {
             if (lState.outputAccount === void 0 && lState.account === void 0) return [];
             if (gState[lState.outputAccount || lState.account] === void 0) return [];
 
@@ -125,7 +145,7 @@ const procedures = {
             qos: z.number(),
             tabID: z.string().optional()
         }))
-        .resolve(async (gState, lState, input, socket): Promise<boolean> => {
+        .resolve(async (gState: GlobalData, lState, input, socket): Promise<boolean> => {
             if (lState.outputAccount === void 0) return false;
             if (gState[lState.outputAccount] === void 0) return false;
             gState[lState.outputAccount] = gState[lState.outputAccount]
@@ -150,7 +170,7 @@ const procedures = {
             tabID: z.string(),
             specificData: specificDataGuard
         }))
-        .resolve(async (gState, lState, input): Promise<SpecificDataResponse> => {
+        .resolve(async (gState: GlobalData, lState, input): Promise<SpecificDataResponse> => {
             if (lState.outputAccount === void 0) return "";
             if (gState[lState.outputAccount] === void 0) return "";
 
@@ -188,7 +208,7 @@ const procedures = {
 
                 tab = tabs[Math.floor(Math.random() * tabs.length)];
             } else {
-                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID);
+                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID)!;
                 if (!tab) return false;
             }
 
@@ -225,7 +245,7 @@ const procedures = {
 
                 tab = tabs[Math.floor(Math.random() * tabs.length)];
             } else {
-                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID);
+                tab = gState[lState.outputAccount].find((v) => v[0] === input.tabID)!;
                 if (!tab) return false;
             }
 
@@ -241,7 +261,7 @@ const procedures = {
                 tab[2].on("uploadAttachmentResponse", listener);
                 tab[2].emit("uploadAttachmentData", input.dataEncrypted, nonce, tab[0]);
             });
-        }),
+        })
 };
 
 const apiServer = new DTSocketServer<
